@@ -1,0 +1,164 @@
+:root {
+  --ink: #0b0b08;
+  --cream: #ede6e3;
+  --silver: #dadad9;
+  --coral: #f06449;
+  --sky: #5bc3eb;
+
+  --navy: #10243a;
+  --light-gray: #eef0f3;
+  --navy-text: #152e47;
+
+  --header-bg: var(--light-gray);
+  --header-text: var(--navy-text);
+  --header-button: #f9fafbef;
+  --header-button-hover: #dde8f0;
+  --header-border: #c3d0dc;
+  --header-accent: #246184;
+  --language-bg: #dbeaf2;
+  --language-border: #94b6c7;
+  --language-text: var(--navy-text);
+  --footer-muted: #496177;
+
+  --page: var(--navy);
+  --surface: #192f48;
+  --surface-raised: #203b57;
+  --border: #36526b;
+  --border-hover: #67869d;
+  --line: #2e4a64;
+  --text: var(--light-gray);
+  --muted: #becfdd;
+  --quiet: #abbed0;
+  --accent: var(--coral);
+  --focus: var(--sky);
+  --primary-fill: var(--light-gray);
+  --primary-text: var(--navy);
+  --primary-hover: #d9e9f2;
+  --statistics-hover: var(--sky);
+  --burned: var(--coral);
+  --unburned: var(--sky);
+  --no-data: var(--silver);
+  --coral-soft: #ff9d8b;
+  --coral-tint: #f0644921;
+  --sky-tint: #5bc3eb20;
+
+  --map-water: #111b22;
+  --map-land: #262b2d;
+  --map-line: #4e5c62;
+  --map-active-land: #35434b;
+  --map-active-line: #a1d2e1;
+  --map-grid: #2e393f;
+
+  --heat-low: #2c4156;
+  --heat-high: var(--coral);
+  --trend-grid: #3b566e;
+
+  --globe-ocean: #204453;
+  --globe-land: #5a7a83;
+  --globe-coast: #93b1b78c;
+  --globe-grid: #b0d4dc29;
+  --globe-rim: #8bc3d2;
+  --globe-region: #ce6a55;
+  --globe-region-line: #f8b39f;
+  --locator-ocean: #203b4a;
+  --locator-land: #4e6670;
+  --locator-coast: #a9bfca88;
+  --locator-grid: #7facbf37;
+  --locator-region: #a95e49;
+  --locator-region-line: #ff9d8b;
+  --locator-rim: #5da6c486;
+  --locator-orbit: #4c9cb868;
+  --locator-active-halo: #f0644945;
+  --locator-dot-halo: #5bc3eb38;
+  --masthead-glow: #c4d7e4;
+  --locator-neutral-ocean: #363048;
+  --locator-neutral-land: #73718c;
+  --locator-neutral-coast: #b8b4cb87;
+  --locator-neutral-grid: #b9a9d844;
+  --locator-neutral-rim: #a9a1cc92;
+  --locator-neutral-orbit: #9589bb80;
+  --locator-neutral-dot: #c3b5ee;
+  --locator-neutral-dot-halo: #b5a0e84d;
+  --masthead-neutral-glow: #d7d4e5;
+
+  --ruler-start: #c32915;
+  --ruler-end: #f4b135;
+  --ruler-track: #283f55;
+  --ruler-rim: #4a6881;
+  --ruler-tick: #64869f;
+  --ruler-thumb: #f5eeea;
+  --ruler-thumb-rim: #b6aca4;
+  --overlay: #172f46eb;
+  --accent-text: var(--coral-soft);
+  --cool-text: var(--sky);
+  --heat-mark: #ede6e37a;
+  --heat-hatch: #405a72;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --header-bg: var(--navy);
+  --header-text: var(--light-gray);
+  --header-button: #172f47f2;
+  --header-button-hover: #24476a;
+  --header-border: #4a6887;
+  --header-accent: var(--sky);
+  --language-bg: #244760;
+  --language-border: #6594ad;
+  --language-text: var(--light-gray);
+  --footer-muted: #bdcede;
+
+  --page: var(--light-gray);
+  --surface: #f9fafb;
+  --surface-raised: #e5eaf0;
+  --border: #c9d1da;
+  --border-hover: #8a9dae;
+  --line: #d4dce4;
+  --text: var(--navy-text);
+  --muted: #425b71;
+  --quiet: #496177;
+  --accent: #a43824;
+  --accent-text: #923321;
+  --cool-text: #205b77;
+  --focus: #14648a;
+  --primary-fill: var(--navy);
+  --primary-text: var(--light-gray);
+  --primary-hover: #24476a;
+  --statistics-hover: #216283;
+  --overlay: #f9fafbef;
+  --heat-low: #dce4eb;
+  --trend-grid: #c7d3dd;
+  --heat-mark: #385267a3;
+  --heat-hatch: #c5d1dc;
+  --masthead-glow: #1c3d5b;
+  --masthead-neutral-glow: #2c3050;
+  --ruler-track: #e2ded6;
+  --ruler-rim: #c4beb5;
+  --ruler-tick: #a0a3a4;
+  --ruler-thumb-rim: #beb7ab;
+}
+
+:root[data-color-vision] {
+  --alert-symbol-burned: #ffc857;
+  --alert-symbol-unburned: #66d7ff;
+  --alert-symbol-missing: #fff;
+  --alert-symbol-outline: #0d1b29;
+  --trend-detections: #ffc857;
+  --trend-median: #75d5ff;
+  --heat-low: #d6ebfa;
+  --heat-high: #6cadde;
+  --heat-mark: #264a66;
+  --globe-region: #d49e45;
+  --globe-region-line: #ffe0a0;
+  --locator-region: #b37c2a;
+  --locator-region-line: #ffe0a0;
+  --locator-active-halo: #ffc8574d;
+  --ruler-start: #1e74a8;
+  --ruler-end: #6dd3ff;
+}
+:root[data-color-vision][data-theme="light"] {
+  --trend-detections: #9d4700;
+  --trend-median: #006b9d;
+  --ruler-start: #175077;
+  --ruler-end: #287ba6;
+}

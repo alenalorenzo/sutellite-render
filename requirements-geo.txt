@@ -1,0 +1,2 @@
+# Optional: local sampling of ESA WorldCover 2021 GeoTIFF tiles
+rasterio>=1.4,<2.0

@@ -1,0 +1,33 @@
+# Python virtual environment and bytecode
+.venv/
+.venv-web/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+
+# Local configuration and secrets
+.env
+.streamlit/secrets.toml
+
+# Local datasets and generated outputs
+/processed/
+data/worldcover/
+/data/suggestions.sqlite3*
+.cache/
+
+# Temporary files
+*.tmp
+*.log
+
+# Large generated comparison intermediate (retain summary reports)
+/reports/sensor_comparison/monthly_spatial_grid_counts.csv
+
+# Legacy map cache / generated static map data
+reports/map/cache/
+reports/map/*.json
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

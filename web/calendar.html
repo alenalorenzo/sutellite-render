@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title data-i18n>Sutellite – hotspot calendar</title>
+<link rel="stylesheet" href="typography.css">
+<script src="accessibility.js"></script>
+<script src="translations.js"></script>
+<script src="i18n.js"></script>
+<style>
+:root{--bg:#fafaf8;--fg:#1c1c1a;--mut:#62625c;--card:#fff;--line:#d9d9d2;--acc:#31688e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#ececea;--mut:#a3a39b;--card:#1e2125;--line:#34383d;--acc:#7fb8e0;color-scheme:dark}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--sans)}
+main{max-width:960px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1rem;margin:0 0 8px}
+.sub{color:var(--mut);margin:0 0 12px}
+.warn{background:var(--card);border:1px solid var(--line);border-left:4px solid #e0a100;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px}
+label{display:flex;flex-direction:column;font-size:.8rem;color:var(--mut);gap:2px}
+select,button{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+.grid{display:grid;grid-template-columns:40px repeat(12,minmax(0,1fr));gap:2px;min-width:0}
+.hd{font-size:.7rem;color:var(--mut);text-align:center}.yr{font-size:.7rem;color:var(--mut);text-align:right;padding-right:4px;line-height:16px}
+.c{height:16px;border-radius:2px;position:relative;outline-offset:1px}
+.c.b{background:transparent;border:1px dashed var(--line)}
+.c:focus-visible,.c:hover{outline:2px solid var(--fg)}
+.c.est::after,.c.low::after{content:"";position:absolute;right:1px;bottom:1px;background:#fff;box-shadow:0 0 0 1px #000}
+.c.est::after{width:5px;height:5px;border-radius:50%}
+.c.low::after{width:5px;height:5px}
+.leg{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:.8rem;color:var(--mut);margin-top:8px}
+.ramp{height:10px;width:140px;border-radius:2px;background:linear-gradient(90deg,#440154,#3e4989,#26828e,#35b779,#b5de2b,#fde725)}
+.k{display:inline-block;width:8px;height:8px;background:#fff;box-shadow:0 0 0 1px #000;vertical-align:middle;margin-right:4px}
+#detail{min-height:3em;margin-top:8px;font-size:.9rem}
+.big{font-size:1.4rem;font-weight:600}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.75rem;border:1px solid var(--line)}
+.scroll{overflow-x:auto}
+ul{margin:4px 0 0;padding-left:18px;font-size:.85rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1 data-i18n>Sutellite – harmonized hotspot calendar <span class="tag" data-i18n>provisional</span></h1>
+<p class="sub" data-i18n>MODIS and VIIRS active-fire detections, expressed as VIIRS S-NPP-equivalent records per month, Nov 2000 – Jul 2026.</p>
+<div class="warn" data-i18n><strong data-i18n>Work in progress.</strong> Region-level view built from the project’s monthly counts (ARCHIVE stream). Area-of-interest selection and the cell-level Parquet will follow. Counts are source detection records, not unique fires.</div>
+
+<div class="card">
+<div class="row">
+<label data-i18n>Region<select id="region"></select></label>
+<label data-i18n>Colour scale<select id="scale"><option value="sqrt" data-i18n>Square root</option><option value="lin" data-i18n>Linear</option><option value="log" data-i18n>Logarithmic</option></select></label>
+<label data-i18n>Compare month<select id="month"></select></label>
+<button id="dl" type="button" data-i18n>Download CSV</button>
+</div>
+<div id="conf"></div>
+<div class="scroll"><div class="grid" id="grid" role="grid" aria-label="Monthly harmonized hotspot counts by year and month" data-i18n-attrs="aria-label"></div></div>
+<div class="leg"><span data-i18n>Low</span><span class="ramp" aria-hidden="true"></span><span data-i18n>High</span>
+<span data-i18n><span class="k" style="border-radius:50%"></span>2002–2011 estimated from MODIS</span>
+<span data-i18n><span class="k"></span>Nov 2000 – Jun 2002 estimated from Terra only (lowest confidence)</span>
+<span data-i18n>No marker: observed VIIRS S-NPP (2012 →)</span></div>
+<div id="detail" aria-live="polite" data-i18n>Hover or focus a cell for details.</div>
+</div>
+
+<div class="card"><h2 id="ctitle" data-i18n>Monthly comparison</h2><div id="cmp"></div><div class="scroll"><svg id="bars" viewBox="0 0 640 190" width="100%" role="img" aria-label="Detections for the selected month in each year" data-i18n-attrs="aria-label"></svg></div></div>
+
+<div class="card"><h2 data-i18n>How reliable is the estimated period?</h2>
+<p id="val" style="margin:0 0 4px;font-size:.9rem"></p>
+<ul>
+<li data-i18n>Before 2012, MODIS counts are scaled by a regional S-NPP/MODIS ratio per calendar month, estimated on 2013–2022. Day and night are pooled.</li>
+<li data-i18n>Reference platform is S-NPP only, so the series does not jump when NOAA-20/21 come online.</li>
+<li data-i18n>Validation: leave-one-year-out on 2013–2022, predicting regional monthly S-NPP totals. Smaller areas will have larger errors.</li>
+<li data-i18n>No observation-opportunity correction and no event matching. NRT records (after Jul 2026) are not merged.</li>
+</ul></div>
+</main>
+<script>
+const D={"start":[2000,11],"end":[2026,7],"snpp":[2012,1],"aqua":[2002,7],"names":{"angola":"Angola","australia":"Australia","brasil":"Brasil","california":"California","espana":"Espa\u00f1a","indonesia":"Indonesia","rdc":"RDC","zambia":"Zambia"},"err":{"angola":[0.0504,0.1175,0.2015,0.3892],"australia":[0.0417,0.0787,0.1285,0.2088],"brasil":[0.0396,0.081,0.151,0.2147],"california":[0.1212,0.1318,0.2983,0.3639],"espana":[0.2037,0.2332,0.4517,0.4775],"indonesia":[0.068,0.1491,0.1904,0.3755],"rdc":[0.0445,0.0813,0.1308,0.2605],"zambia":[0.0596,0.151,0.3557,0.8221]},"regions":{"angola":[18268,2546,1402,1421,732,3051,76042,84039,326156,339598,176111,147618,11840,3277,1622,2940,540,9681,134727,267161,275992,213632,157677,28371,7598,2270,2121,1822,1850,15139,151840,227261,323690,343045,167069,66891,2614,773,615,1296,4638,8023,148747,253001,295466,301609,226492,35651,3994,1624,724,1016,2475,7212,86631,250690,340447,304325,289488,38983,8156,3001,3807,3055,3982,9348,71442,221939,305868,291784,168219,24225,962,1014,769,1590,4448,4125,137532,234653,330589,307453,209228,27631,4719,1873,2211,6004,2322,5390,59908,215664,295900,274111,310321,77306,5793,1979,1147,1857,1936,6364,64429,186121,305970,392552,227409,17210,9166,1014,949,2375,14403,3417,65575,224957,297777,416291,219792,70941,7291,731,417,1492,1403,2017,50694,226052,348305,376756,309887,60763,4384,2100,6147,7250,7546,10445,128236,255243,299072,243608,225310,30679,2619,549,909,2437,1230,11176,115008,244102,309551,355192,209338,59055,5576,1262,1523,7888,2530,2842,59931,204526,330375,329234,196213,53108,2493,896,1430,2376,2675,10496,90885,223100,336611,405498,216809,37614,12470,901,1095,1004,1390,6109,117961,277251,297676,352086,219825,60829,5519,1280,2087,5314,9674,4732,68972,239865,291964,345496,291803,46628,6335,1686,1135,1480,9428,5023,27958,207336,285671,281785,263453,86149,19506,4525,1647,3245,5888,7339,76388,287544,395732,341892,259718,43722,4165,1520,796,1921,3161,4737,83780,224482,313272,247737,243497,76586,5302,2659,5333,6414,2282,3427,68412,199931,347599,275498,290704,55732,4732,1142,1721,5214,2678,1954,71534,190768,214098,228023,266982,75823,6166,2281,518,4530,1951,7983,63846,187388,324964,453040,300590,53757,4542,1096,2544,3017,3244,13386,120525,240148,197209,482109,210796,82123,2064,1401,1022,2937,1845,1687,36366,150484,291466,382010,301098,81783,7496,2561,2860,15110,3996,1290,35977,142807,254069],"australia":[182861,127146,247182,23416,42155,176509,276062,65177,136461,361485,452747,307909,324970,268974,135490,42561,44275,151922,175463,114112,108333,142247,186732,414623,336992,192333,183777,54571,24112,46247,88995,59784,52162,49854,116656,167836,152372,45111,27126,11101,26351,77863,75473,74930,83210,104590,223700,420495,265800,123097,41857,42625,34537,85584,114229,62252,66740,75547,90779,128021,100564,86160,32122,17852,19093,64026,82268,66098,59992,159883,212590,183059,398404,186265,47625,41361,17854,46772,60745,53457,80330,124910,274526,235608,172484,83242,44995,8376,15039,83277,106596,45151,61018,98903,87639,173249,125074,42338,16848,26144,22839,81810,101303,51139,63842,87368,121865,262115,240305,149835,39607,27169,26947,53922,60969,66391,52407,78016,47061,54612,62500,16834,24084,13146,39527,101366,146553,106807,99962,259278,583185,428932,196256,113489,17076,54269,18353,109076,154481,129891,113774,197295,327235,468449,351192,202693,116528,40398,21447,84681,50256,52025,68325,88136,107093,140792,108147,69420,71857,29762,32264,61557,76679,107196,77408,141759,167407,252045,144319,54459,21459,27374,57282,123936,163555,63294,75499,87898,133823,168518,177000,43517,34586,16255,27159,100070,49343,51613,91763,66614,27114,103420,142077,67817,11044,16313,38260,77102,145619,108175,67055,103896,202691,129669,190624,151293,44130,18333,39888,165703,211632,98194,91413,85848,128592,247348,210827,128666,111726,75386,53354,62964,78827,83974,105972,79612,106171,141028,258744,422482,199080,34521,24275,41455,79270,65083,84978,50636,44557,66251,121973,35612,13612,7621,18315,78486,126595,43747,66659,79370,76594,134798,101619,72045,31180,13564,47354,124101,112061,66278,64846,68505,60541,75429,99168,41693,11257,19022,62094,84278,174317,78790,63658,97371,237229,594111,233300,199845,41700,16131,21662,95721,95980,67089,55641,77080,100629,199365,146407,62462,75368,37000,31175,53662,120855,95187,86110,121636,113517,314817,125277,76834,48955,7799,18339,88660,75314,90697,108995],"brasil":[108382,69957,16315,19850,13729,13550,19930,29262,95346,394809,401784,291934,127742,66392,15058,10929,8345,17992,38435,88913,113332,486553,616451,466991,250166,102343,42078,22311,29362,18434,38394,100173,184230,388559,637893,379657,197797,122735,23904,11907,15920,14522,42997,121227,195497,437015,815366,396657,269083,169637,45973,17806,13374,16002,33063,52441,174250,646495,756324,487657,205067,75767,29988,14382,12200,11537,24399,45179,103968,361530,547654,210595,166562,84700,26308,17245,21599,15396,29700,73010,122504,619396,1073004,535563,211865,66699,18369,11461,10270,9463,15702,28744,86347,243014,348384,391488,188180,81829,27851,9393,10603,12950,19004,24069,49167,138291,232553,216676,187684,74319,22070,19271,14903,16538,26630,60432,134005,644200,883066,309323,129220,59364,13306,7528,6979,9298,17489,34981,60431,171868,406100,168851,101976,82934,5850,18085,18205,16296,28120,45065,100356,368276,514386,340923,118197,55752,22827,13364,15289,12444,20513,30960,56277,141119,251483,164469,71772,66405,25334,13970,13363,11806,18790,40660,70672,280285,307305,290004,108170,64789,35457,17030,11079,13747,13518,37345,60424,255360,458911,423160,219864,172679,51486,25125,28016,19518,21465,39480,119553,278111,313983,230010,124460,52196,19392,9665,9673,8525,16705,34897,98061,256949,573336,305072,127531,83464,20383,12755,16514,11392,21792,36727,77870,151987,285495,160336,81713,38620,28205,20149,45196,20644,18810,45326,89201,360946,414088,215244,142250,59226,22000,14057,23895,20736,23696,43454,99600,345843,575512,346614,98152,52685,18576,15135,16964,14878,34041,50220,100884,372537,392137,216614,70878,30328,21980,13557,11079,18713,42160,50804,64434,293555,456918,268635,120741,42807,16967,13220,15302,13893,32814,58337,78154,196468,323472,302182,222099,72594,31999,35122,33975,13063,36404,78087,82407,533094,658581,243694,127649,61665,17871,12762,14729,8897,26852,36987,55501,134317,214058,211193,87830,40624,24786,13441,12262,8796,21126,29198,34670],"california":[2930,1011,1476,569,1463,1449,1472,751,1161,9792,4443,2873,2346,670,1010,1115,1387,1639,1195,4971,5986,6800,5205,4132,3186,1977,522,931,1696,989,1152,2136,1947,3198,9698,24747,3453,1317,916,611,2438,2452,2298,1818,3001,3038,3558,5562,2076,951,208,344,787,1885,1247,3529,1239,2345,3720,5283,2037,756,593,1462,319,552,1498,1900,8387,7284,20738,4822,2646,1573,1867,914,1740,1410,1638,1726,6404,14475,8365,15546,2250,1668,580,607,1829,2321,1783,29555,38803,9909,7150,4002,2732,1274,894,574,1388,1672,1683,1188,3242,15017,4090,2800,3155,884,336,254,798,577,1017,1214,1850,1594,2282,1761,1238,238,469,808,430,1415,900,1009,2418,1346,1741,2506,2064,770,349,958,757,783,1066,1459,2718,26038,4023,1443,1656,598,667,1221,1048,1144,2107,1957,3104,22472,6796,2093,1821,1602,1356,1275,1278,1095,1454,1268,2545,15307,12304,1938,1171,727,964,1320,1376,1301,733,4987,2942,27138,10028,2057,2836,1132,388,1179,1028,1273,1000,3528,5226,11796,6368,2492,3134,809,421,538,1388,1373,1472,1859,9722,17838,16534,13828,2185,11460,1387,2134,1016,1434,1092,2483,17141,39618,8536,2879,8905,1420,965,555,1099,1397,1247,1613,1578,1924,6571,5420,2526,863,1371,2712,2169,1486,1263,1697,4876,58462,131425,26488,3187,1931,1560,1665,2186,1990,1522,3100,22917,105869,50979,7039,1793,1188,1613,2498,2113,1178,1722,1526,3014,3411,8658,1891,1853,932,609,1306,587,1814,1212,1737,2171,9705,5903,5125,2793,1626,875,628,1411,1684,1432,3434,7731,6647,6732,3602,2881,1281,3803,1044,1102,1595,1593,1372,5047,7974,7631,2154,1736,1347,1338,1340,1727,1173,1752,1163,1648],"espana":[823,306,250,990,535,3221,1271,743,2355,3108,7382,2260,2168,4180,984,2565,679,2675,1130,2735,3430,3995,4479,3487,1368,159,564,496,2982,2029,2450,2420,2842,8665,7131,2510,609,333,608,1803,1138,2159,1991,3953,5072,3254,7377,4514,2705,657,1757,2134,3163,1423,1392,1943,2864,8612,2746,2433,1096,756,416,1130,1457,1141,1897,2087,1949,16864,2164,1000,552,294,547,222,1603,788,1457,1302,2827,2063,2112,2638,3214,781,974,1985,1170,1376,558,1446,874,1085,767,1648,1083,373,350,1218,4809,1114,1286,979,2958,1785,2727,1442,855,289,115,230,796,1241,1322,892,780,2505,1690,1629,745,199,498,1126,1316,2808,1163,1225,915,1089,2121,11177,587,627,317,2338,4274,623,1188,2703,2529,3929,1964,830,392,431,446,463,414,853,763,1076,1503,2231,2372,1552,1316,951,326,608,2322,1089,1078,1032,1199,1364,1353,1614,480,340,720,486,1239,1080,953,1140,2729,2260,983,823,944,1604,378,466,620,472,685,1214,1177,3030,2446,1554,980,696,1010,616,1892,3028,796,1088,1571,2435,1548,4211,1157,572,578,762,484,795,730,674,934,1447,1258,1194,387,492,1138,1929,2299,580,1033,1456,1135,1543,1232,1188,458,344,314,1193,668,189,651,712,1129,2231,1578,1293,750,279,371,411,1179,728,904,865,1416,2590,3165,7561,4196,2771,1856,1337,613,728,913,3458,7410,2960,1130,890,569,201,375,1051,2875,966,1290,669,1030,1891,616,650,615,411,420,698,558,1138,618,574,721,1080,965,701,494,414,492,448,480,821,754,1003,1993,21161,1508,1261,620,210,209,937,1265,1160,775,1594,8358],"indonesia":[5231,3997,1155,3436,8827,2252,5349,1985,38629,73481,42916,25139,4097,2003,5199,26843,19638,2796,6988,10798,32234,197124,148485,173066,18688,4469,2635,2266,12373,2112,13340,45001,22624,75033,75134,36559,9732,1627,7112,8065,5888,3943,14266,41295,11288,156056,109351,135150,26142,3275,24924,49967,38019,6456,5843,22863,17643,75814,75468,30876,6198,2003,7170,12388,16549,3393,5642,11266,48406,160581,170386,267757,54140,9009,3249,10335,9184,3007,4441,7519,14792,41049,61454,43124,9280,3044,6318,12813,2646,2766,18638,11955,16934,47704,46715,20089,6125,1640,11203,11872,4172,6248,15116,28292,53101,120414,172419,41155,14875,3147,2335,9526,7292,3421,5457,4856,6246,16154,15238,24994,3921,1933,2102,9171,3066,4617,9837,18650,38344,86907,83346,29215,7155,1685,3341,4425,4837,4398,7775,34816,21897,70229,100556,50771,11201,4367,4457,3185,10383,5019,6434,66713,17518,48560,42940,43246,7003,1764,8639,65533,76101,4107,5065,17237,42207,38052,126663,127549,41493,2951,3348,6649,7741,4414,6259,12577,43274,120891,295035,322008,40262,13366,15417,6638,8933,6143,3305,4424,8176,27920,17144,12399,4743,2008,2283,2121,1987,2045,2740,4248,9853,18075,22597,18043,4515,2342,1928,7042,3071,2870,3866,5688,14958,49563,47931,43488,8765,2003,1706,5511,10154,3547,4570,4693,16946,61232,197018,84147,41474,6283,3599,4024,5649,4091,2525,3401,5790,20301,17398,15920,7294,1544,1016,5207,3220,2878,2524,3775,8499,9482,13398,13921,2863,1542,2006,2217,4980,4484,3731,3526,5775,10129,10935,5309,2289,1839,1781,1868,2602,3808,5185,7407,13684,42818,71726,78784,19165,4560,2250,3683,4048,3505,2737,3619,6031,16503,33586,22494,4463,1267,1314,1519,1640,2119,3632,5051,18473,19627,21518,15056,4631,1476,5736,3308,7253,4428,4260,7577,21742],"rdc":[13975,32671,82570,195217,84925,84652,158844,123695,353568,447679,153420,41901,17583,33883,110129,179243,49917,41774,210976,336387,271074,255848,100807,29704,8514,31923,53172,76668,41767,43259,213699,243583,331078,292689,118004,39966,10952,35315,48536,112155,77876,42905,293762,330701,360493,298363,100661,31027,11915,33254,92696,90052,65379,53107,157791,312237,430579,322286,145422,30803,24059,41800,72844,55716,70638,69543,101076,326715,383821,356755,129334,44574,16222,51817,115540,70938,111662,42953,148699,238446,292586,286940,138282,28242,14954,45805,58731,98200,81718,55322,136999,330326,388222,240605,164947,41778,19518,33635,57920,40617,85975,67876,107169,268566,513922,360555,189960,31752,21384,26544,64610,51481,109622,65471,187299,302859,350993,436068,153257,51556,12974,37524,86297,75002,127094,48280,109859,255525,375836,361178,173917,29547,18297,53786,42532,77607,79883,65966,123692,304208,349093,333146,115030,25932,11995,33203,50954,79326,51592,51871,168633,407159,363380,437173,120480,29663,14804,38415,71105,87549,78409,34234,157378,322384,392530,268252,154232,35308,16027,37289,111332,66617,74854,46724,127689,269326,441152,465355,156079,27627,14259,60808,97147,148663,61147,37344,180906,404547,418641,414175,141430,38519,14886,48311,82789,107954,81690,45329,181423,359942,335552,359631,159290,35023,16449,44112,111814,66064,92462,37862,79661,327268,473562,396023,144709,35552,19108,40242,62899,108952,114596,58828,88365,402347,427847,369691,123703,22483,13614,34768,92807,132720,88143,47493,142581,339707,450522,346178,174354,35038,17969,36022,56570,112856,119777,39144,168610,309947,519329,322843,153510,27769,15462,30656,55158,112129,106019,34466,121556,334036,359933,228948,132077,51746,10727,33443,73443,117646,68170,35783,118456,239740,484758,474582,145790,44092,3649,29899,69385,124519,124807,55844,226452,432720,221548,495228,140862,28590,13273,50637,77984,116985,94834,36424,96883,299409,400152,543385,202968,40476,18997,30025,63766,85057,66542,28032,150274,317677,299320],"zambia":[6189,279,329,15,89,317,17014,28477,167391,253455,254172,119420,5559,314,673,1586,3438,15416,61551,112907,154959,129684,139343,117983,7493,1602,147,95,97,1131,23005,61996,156632,253955,213995,162219,13613,573,104,255,116,300,15811,76916,163996,240323,217867,112415,10888,501,199,190,689,15742,96362,127199,153769,234580,165371,105436,13752,430,48,48,67,541,9986,68429,154010,229896,201113,130641,12450,922,43,160,311,2532,48177,112250,147974,232485,232477,98915,7935,385,48,138,195,2591,31778,114524,161106,192932,343768,111967,6645,206,56,160,146,1126,23472,92678,139001,225813,251769,98867,7467,555,225,138,97,344,12753,88034,128540,280441,282350,145877,13910,492,126,121,97,1047,20886,110977,206415,237993,267248,58626,8694,1172,52,115,157,3724,45670,112880,191530,241186,215651,75259,13101,600,56,79,253,9333,52234,125139,168565,259126,222514,68318,14644,1357,157,72,173,1212,19109,79467,169961,239623,225729,92988,20498,1637,378,528,1848,1016,21592,91675,180012,283766,245775,84236,18512,1300,551,167,163,1936,20287,97204,164725,262756,240951,108835,16553,765,80,44,154,400,4395,47119,135788,252108,286477,99547,12380,505,1050,112,177,652,7132,59531,103201,318490,265522,79806,20183,1890,253,711,4233,5557,38107,100961,192026,252160,225722,66889,14984,605,129,82,166,1497,19923,54917,131768,232396,256727,90877,14648,202,45,96,166,752,17414,65060,136057,241420,242251,77790,25602,7945,186,120,198,535,10979,45875,75624,197287,259127,160230,11815,1755,130,140,252,5811,45696,95621,135011,240026,246969,84700,11053,2020,353,2740,4269,9468,56699,111056,136657,236012,152951,54672,6517,3922,111,171,409,501,4858,42223,114466,333291,254641,98801,12071,615,165,84,122,537,13180,69708,146521]},"overall":{"TA":[0.0667,0.2731],"T":[0.1196,0.3721]}};
+const {t,text,monthName,periodName,numberFormat}=window.sutelliteI18n;
+const months=Array.from({length:12},(_,index)=>index+1);
+const regionNames={...D.names,brasil:'Brazil',espana:'Spain',rdc:'DR Congo'};
+const I=(y,m)=>y*12+m-1, S0=I(D.start[0],D.start[1]), E0=I(D.end[0],D.end[1]), SN=I(D.snpp[0],D.snpp[1]), AQ=I(D.aqua[0],D.aqua[1]);
+const val=(r,y,m)=>{const p=I(y,m)-S0,v=D.regions[r];return p>=0&&p<v.length?v[p]:null};
+const kind=(y,m)=>{const i=I(y,m);return i>=SN?'obs':i>=AQ?'est':'low'};
+const fmt=numberFormat({maximumFractionDigits:0}).format;
+const compact=numberFormat({notation:'compact',maximumFractionDigits:0}).format;
+const wholePercent=numberFormat({style:'percent',maximumFractionDigits:0}).format;
+const tenthPercent=numberFormat({style:'percent',minimumFractionDigits:1,maximumFractionDigits:1}).format;
+const pct=x=>x<.1?tenthPercent(x):wholePercent(x);
+const med=a=>{const s=[...a].sort((x,y)=>x-y),h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2};
+const STOPS=['#440154','#482878','#3e4989','#31688e','#26828e','#1f9e89','#35b779','#6ece58','#b5de2b','#fde725'];
+function ramp(t){t=Math.max(0,Math.min(1,t));const x=t*(STOPS.length-1),i=Math.min(STOPS.length-2,Math.floor(x)),f=x-i;
+const a=STOPS[i],b=STOPS[i+1],c=k=>parseInt(a.slice(k,k+2),16)*(1-f)+parseInt(b.slice(k,k+2),16)*f;
+return 'rgb('+[1,3,5].map(k=>Math.round(c(k))).join(',')+')'}
+const $=id=>document.getElementById(id);
+const reg=$('region'),sc=$('scale'),mo=$('month');
+for(const id of Object.keys(D.regions))reg.add(new Option(t(regionNames[id]),id));
+for(const month of months)mo.add(new Option(monthName(month),month));
+mo.value=D.end[1];
+function norm(v,max,mode){if(v<=0)return 0;return mode==='lin'?v/max:mode==='log'?Math.log10(v+1)/Math.log10(max+1):Math.sqrt(v/max)}
+function conf(r){const e=D.err[r][0];return e<.08?['High',e]:e<.15?['Medium',e]:['Lower',e]}
+function render(){
+ const r=reg.value,max=Math.max(...D.regions[r]),mode=sc.value,g=$('grid');let h='<div></div>'+months.map(m=>'<div class="hd">'+monthName(m,'short')+'</div>').join('');
+ for(let y=D.start[0];y<=D.end[0];y++){h+='<div class="yr">'+y+'</div>';
+  for(let m=1;m<=12;m++){const v=val(r,y,m),label=periodName(y,m)+' · '+(v===null?t('No data'):fmt(v));
+   if(v===null){h+='<div class="c b" role="gridcell" aria-label="'+label+'"></div>';continue}
+   const k=kind(y,m);h+='<div class="c '+(k==='obs'?'':k)+'" role="gridcell" tabindex="0" data-y="'+y+'" data-m="'+m+'" style="background:'+ramp(norm(v,max,mode))+'" aria-label="'+label+'"></div>'}}
+ g.innerHTML=h;
+ const [confidence,error]=conf(r);
+ $('conf').innerHTML=t('Confidence of estimated years for {region} · {confidence} (median error {aqua} for 2002–2011 and {terra} for the Terra-only months)',{
+  region:'<strong>'+t(regionNames[r])+'</strong>',confidence:'<span class="tag">'+t(confidence).toLocaleLowerCase()+'</span>',aqua:pct(error),terra:pct(D.err[r][1]),
+ });
+ $('val').textContent=t('Across all eight regions the median absolute error was {aqua} for Terra+Aqua months (90th percentile {aquaHigh}) and {terra} for Terra-only months (90th percentile {terraHigh}).',{
+  aqua:pct(D.overall.TA[0]),aquaHigh:pct(D.overall.TA[1]),terra:pct(D.overall.T[0]),terraHigh:pct(D.overall.T[1]),
+ });
+ compare(r)}
+function detail(el){if(!el.dataset.y)return;const r=reg.value,y=+el.dataset.y,m=+el.dataset.m,v=val(r,y,m),k=kind(y,m);
+ const error=D.err[r][k==='low'?1:0];
+ const source=k==='obs'?t('Observed, VIIRS S-NPP'):t('Estimated from MODIS. Typical regional error ±{error}, approximately {low}–{high}.',{
+  error:pct(error),low:fmt(v*(1-error)),high:fmt(v*(1+error)),
+ });
+ $('detail').innerHTML='<strong>'+periodName(y,m)+'</strong> · '+t(v===1?'{count} detection':'{count} detections',{count:fmt(v)})+' · '+source}
+$('grid').addEventListener('mouseover',e=>detail(e.target));$('grid').addEventListener('focusin',e=>detail(e.target));
+function compare(r){
+ const m=+mo.value,ys=[];for(let y=D.start[0];y<=D.end[0];y++)if(val(r,y,m)!==null)ys.push(y);
+ const cur=ys[ys.length-1],prior=ys.slice(0,-1),pv=prior.map(y=>val(r,y,m)),viirs=prior.filter(y=>kind(y,m)==='obs').map(y=>val(r,y,m));
+ $('ctitle').textContent=t('{period} compared with earlier years',{period:periodName(cur,m)});
+ const v=val(r,cur,m),md=med(pv),dd=viirs.length?med(viirs):null,d=x=>((v-x)/x*100);
+ const f=x=>'<strong>'+(x>=0?'+':'')+wholePercent(x/100)+'</strong>';
+ const detections=t(v===1?'{count} detection':'{count} detections',{count:'<span class="big">'+fmt(v)+'</span>'});
+ const comparison=t('{change} vs. the median of {years} ({median})',{change:f(d(md)),years:prior[0]+'–'+prior.at(-1),median:fmt(md)});
+ const viirsComparison=dd?t('{change} vs. the VIIRS-era median ({median})',{change:f(d(dd)),median:fmt(dd)}):'';
+ $('cmp').innerHTML=[detections,comparison,viirsComparison].filter(Boolean).join(' · ');
+ const W=640,H=190,L=44,B=22,T=8,n=ys.length,bw=(W-L)/n,mx=Math.max(...ys.map(y=>val(r,y,m)))||1;let s='';
+ for(let i=0;i<=3;i++){const yy=T+(H-B-T)*(1-i/3);s+='<line x1="'+L+'" x2="'+W+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--line)"/><text x="'+(L-4)+'" y="'+(yy+3)+'" font-size="9" text-anchor="end" fill="var(--mut)">'+compact(mx*i/3)+'</text>'}
+ const mY=(H-B-T)/mx,medy=H-B-md*mY;
+ ys.forEach((y,i)=>{const vv=val(r,y,m),k=kind(y,m),hh=vv*mY,x=L+i*bw+1;
+  s+='<rect x="'+x+'" y="'+(H-B-hh)+'" width="'+(bw-2)+'" height="'+hh+'" fill="'+(k==='obs'?'var(--acc)':'none')+'" stroke="var(--acc)" stroke-width="1.5" '+(k==='low'?'stroke-dasharray="2 2"':'')+'><title>'+y+': '+fmt(vv)+'</title></rect>';
+  if(k!=='obs'){const e=D.err[r][k==='low'?1:0],yl=H-B-vv*(1+e)*mY,yh=H-B-vv*(1-e)*mY,cx=x+(bw-2)/2;s+='<line x1="'+cx+'" x2="'+cx+'" y1="'+Math.max(T,yl)+'" y2="'+yh+'" stroke="var(--fg)" stroke-width="1"/>'}
+  if(i%3===0||y===cur)s+='<text x="'+(x+(bw-2)/2)+'" y="'+(H-6)+'" font-size="9" text-anchor="middle" fill="var(--mut)">'+y+'</text>'});
+ s+='<line x1="'+L+'" x2="'+W+'" y1="'+medy+'" y2="'+medy+'" stroke="#d95f02" stroke-dasharray="4 3"/><text x="'+(W-2)+'" y="'+(medy-3)+'" font-size="9" text-anchor="end" fill="#d95f02">'+t('Median')+' '+prior[0]+'–'+prior.at(-1)+'</text>';
+ $('bars').innerHTML=s}
+[reg,sc,mo].forEach(e=>e.addEventListener('change',render));
+document.addEventListener('sutellite-language-change',()=>{
+ for(const option of reg.options)option.text=t(regionNames[option.value]);
+ for(const option of mo.options)option.text=monthName(Number(option.value));
+ text($('detail'),'Hover or focus a cell for details.');
+ render();
+});
+$('dl').addEventListener('click',async()=>{
+ const r=reg.value;let c='region,year,month,hotspots_viirs_equivalent,source,approx_region_level_error\n';
+ for(let y=D.start[0];y<=D.end[0];y++)for(let m=1;m<=12;m++){const v=val(r,y,m);if(v===null)continue;const k=kind(y,m);
+  c+=[r,y,m,v,k==='obs'?'VIIRS_SNPP_OBSERVED':k==='est'?'MODIS_CALIBRATED_TERRA_AQUA':'MODIS_CALIBRATED_TERRA_ONLY',k==='obs'?'':D.err[r][k==='low'?1:0]].join(',')+'\n'}
+ const name='sutellite_'+r+'_monthly.csv';
+ try{if(window.claude&&claude.use){const dl=await claude.use('downloads');if(dl)await dl.save({filename:name,data:c})}
+ else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();a.remove()}}
+ catch(e){if(!e||e.code!=='declined')text($('detail'),'Download could not be started.')}});
+render();
+</script>
+</body>
+</html>

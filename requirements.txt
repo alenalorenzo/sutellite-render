@@ -1,0 +1,17 @@
+# Core data pipeline
+python-dotenv==1.2.4
+pyarrow==26.0.1
+pandas==3.1.1
+numpy==2.5.4
+duckdb>=1.4.0,<2.0.0
+
+# Streamlit website and visualisations
+streamlit>=1.50,<2.0
+plotly>=6.0,<7.0
+pydeck>=0.9.1,<1.0
+shapely>=2.0,<3.0
+
+# Existing experimental modelling / analysis tools
+scikit-learn==1.9.1
+joblib==1.6.0
+matplotlib==3.11.2

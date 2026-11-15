@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef0f3">
+  <meta name="description" content="Explore historical satellite fire detections and anomalies across eight regions." data-i18n-attrs="content">
+  <meta name="sutellite-api-origin" content="">
+  <title data-i18n>Sutellite — Fire Activity Atlas</title>
+  <script>
+    try {
+      if (localStorage.getItem("sutellite-theme") === "light") document.documentElement.dataset.theme = "light";
+    } catch {}
+  </script>
+  <script src="accessibility.js"></script>
+  <script src="translations.js"></script>
+  <script src="i18n.js"></script>
+  <link rel="icon" href="assets/atlas-icon.png" type="image/png">
+  <link rel="stylesheet" href="assets/leaflet/leaflet.css">
+  <link rel="stylesheet" href="typography.css">
+  <link rel="stylesheet" href="palette.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="assets/leaflet/leaflet.js" defer></script>
+  <script src="app.js" type="module"></script>
+</head>
+
+<body>
+  <a class="skip-link" href="#page-title" data-i18n>Skip to the atlas</a>
+  <header class="site-header">
+    <div class="shell header-row">
+      <a class="brand" href="#home" aria-label="Sutellite home" data-i18n-attrs="aria-label">
+        <img class="brand-logo" src="assets/sutellite-logo.png" alt="Sutellite" width="2048" height="1024">
+      </a>
+      <canvas id="locator" width="1000" height="420" aria-hidden="true"></canvas>
+      <div class="header-actions">
+        <div class="header-preferences">
+          <button class="quiet-button" id="theme-toggle" type="button" aria-pressed="false">
+            <span id="theme-icon" aria-hidden="true">☀</span><span id="theme-label" data-i18n>Day mode</span>
+          </button>
+          <div class="language-controls" role="group" aria-label="Language" data-i18n-attrs="aria-label">
+            <button class="quiet-button" type="button" lang="en" data-language="en" aria-label="English" title="English" aria-pressed="true">EN</button>
+            <button class="quiet-button" type="button" lang="es" data-language="es" aria-label="Español" title="Español" aria-pressed="false">ES</button>
+            <button class="quiet-button" type="button" lang="eu" data-language="eu" aria-label="Euskara" title="Euskara" aria-pressed="false">EU</button>
+          </div>
+        </div>
+        <button class="quiet-button methodology-button" id="open-methodology" type="button" data-i18n>
+          <span class="info-icon" aria-hidden="true">i</span> Methodology
+        </button>
+        <details class="accessibility-menu" id="accessibility-menu">
+          <summary class="quiet-button" data-i18n>Accessibility</summary>
+          <div class="accessibility-options">
+            <label>
+              <input type="checkbox" value="colorVision" aria-labelledby="color-vision-label" aria-describedby="color-vision-description">
+              <span><strong id="color-vision-label" data-i18n>Colorblind mode</strong><small id="color-vision-description" data-i18n>Contrasting colors, symbols and values on maps and charts.</small></span>
+            </label>
+            <label>
+              <input type="checkbox" value="dyslexia" aria-labelledby="dyslexia-label" aria-describedby="dyslexia-description">
+              <span><strong id="dyslexia-label" data-i18n>Dyslexia mode</strong><small id="dyslexia-description" data-i18n>A clear font with more space between letters, words and lines.</small></span>
+            </label>
+          </div>
+        </details>
+      </div>
+    </div>
+  </header>
+
+  <div class="atlas-content">
+    <main class="shell atlas" id="home-view">
+      <section class="home-intro" aria-labelledby="page-title">
+        <div>
+          <p class="archive-context" data-i18n>Fire activity archive <span aria-hidden="true">·</span> 2000–2025</p>
+          <h1 id="page-title" tabindex="-1" data-i18n>Choose a region on the map</h1>
+          <p data-i18n>Open the Historical Calendar for any of the eight highlighted regions.</p>
+        </div>
+        <a class="quiet-button home-action" href="#analyze-data" data-i18n>Analyze your data <span aria-hidden="true">↓</span></a>
+      </section>
+      <p class="load-notice" id="load-notice" role="status" data-i18n>Loading the Sutellite atlas…</p>
+      <section class="globe-section" id="globe-card" aria-label="Study regions on a rotating globe" hidden data-i18n-attrs="aria-label">
+        <div class="globe-toolbar">
+          <p class="globe-help" data-i18n>Drag to rotate</p>
+          <div class="globe-controls" role="group" aria-label="Rotate globe" data-i18n-attrs="aria-label">
+            <button class="quiet-button" type="button" data-globe-turn="-35" aria-label="Rotate west" data-i18n-attrs="aria-label">←</button>
+            <button class="quiet-button" type="button" data-globe-turn="35" aria-label="Rotate east" data-i18n-attrs="aria-label">→</button>
+            <button class="quiet-button" type="button" id="reset-globe" data-i18n>Reset view</button>
+          </div>
+        </div>
+        <div class="globe-stage" id="globe-stage">
+          <canvas id="region-globe" aria-label="Rotating globe. Use the arrow keys to turn it and Tab to select a visible region." tabindex="0" data-i18n-attrs="aria-label"></canvas>
+          <div class="globe-markers" id="globe-markers"></div>
+        </div>
+      </section>
+
+      <section id="analyze-data" class="card upload-card" aria-labelledby="upload-title">
+        <div class="card-header">
+          <h2 id="upload-title" data-i18n>Analyze your data</h2>
+          <p class="card-caption" data-i18n>Choose a FIRMS detection file or a monthly summary, up to 25 MiB. Include latitude and longitude to see detections on the map.</p>
+        </div>
+        <form id="workspace-upload" class="workspace-upload">
+          <div class="workspace-fields">
+            <label class="field">
+              <span data-i18n>CSV or Parquet</span>
+              <span class="file-picker">
+                <span class="file-button" aria-hidden="true" data-i18n>Choose file</span>
+                <span id="workspace-file-name" aria-hidden="true" data-i18n>No file selected</span>
+                <input id="workspace-file" name="file" type="file" accept=".csv,.parquet" required>
+              </span>
+            </label>
+            <label class="field">
+              <span data-i18n>Region if missing from file</span>
+              <input name="region" type="text" maxlength="80" placeholder="e.g. Angola" data-i18n-attrs="placeholder">
+            </label>
+            <button id="workspace-submit" class="quiet-button" type="submit" data-i18n>Analyze file</button>
+            <button id="workspace-resume" class="quiet-button" type="button" hidden data-i18n>Open file analysis</button>
+            <button id="workspace-reset" class="quiet-button" type="button" hidden data-i18n>Clear file</button>
+          </div>
+          <p id="workspace-upload-status" class="card-caption" role="status" hidden></p>
+        </form>
+      </section>
+    </main>
+
+    <main class="shell atlas" id="atlas" hidden>
+      <div class="analysis-bar">
+        <a class="quiet-button" href="#home" id="all-regions" data-i18n><span aria-hidden="true">←</span> All regions</a>
+        <label class="field field-region" id="archive-region" for="region">
+          <span data-i18n>Region</span>
+          <select id="region" disabled></select>
+        </label>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Region analysis" data-i18n-attrs="aria-label">
+        <button class="satellite-tab" id="calendar-tab" type="button" role="tab" aria-selected="true" aria-controls="calendar-view" aria-label="Historical Calendar" data-i18n-attrs="aria-label">
+          <img class="satellite-closed" src="assets/index-not-hover.png" alt="" width="1500" height="400">
+          <span class="satellite-open" aria-hidden="true">
+            <img src="assets/index-historical-calendar.png" alt="" width="1500" height="400">
+            <span class="satellite-reading-label" data-i18n>Historical Calendar</span>
+          </span>
+        </button>
+        <button class="satellite-tab" id="alerts-tab" type="button" role="tab" aria-selected="false" aria-controls="alerts-view" aria-label="Anomalies" tabindex="-1" data-i18n-attrs="aria-label">
+          <img class="satellite-closed" src="assets/index-not-hover.png" alt="" width="1500" height="400">
+          <span class="satellite-open" aria-hidden="true">
+            <img src="assets/index-anomalies.png" alt="" width="1500" height="400">
+            <span class="satellite-reading-label" data-i18n>Anomalies</span>
+          </span>
+        </button>
+      </div>
+
+      <section id="alerts-view" role="tabpanel" aria-labelledby="alerts-tab" hidden>
+        <div class="section-heading">
+          <div>
+            <h2 id="alert-title" tabindex="-1" data-i18n>Historical anomaly map</h2>
+            <p id="map-selection" class="section-subtitle"></p>
+          </div>
+        </div>
+        <div class="alert-modes" role="group" aria-label="Anomaly analysis" data-i18n-attrs="aria-label">
+          <button class="mode-button" id="historical-mode" type="button" aria-pressed="true">
+            <strong data-i18n>Historical comparison <span>2000–2025</span></strong>
+            <small data-i18n>Flags cells with more hotspots than the previous range for the same month.</small>
+          </button>
+          <button class="mode-button" id="ai-mode" type="button" aria-pressed="false">
+            <strong data-i18n>AI results <span>2024–2025</span></strong>
+            <small data-i18n>Isolation Forest checks monthly VIIRS hotspot counts and how far they rise above the 2013–2023 average for each cell and month. An alert also exceeds the earlier maximum.</small>
+          </button>
+        </div>
+        <div class="period-timeline" role="group" aria-label="Anomaly period" data-i18n-attrs="aria-label">
+            <div class="time-filter">
+              <label for="alert-year" data-i18n>Year</label>
+              <div class="range-ruler">
+                <output class="range-readout" id="alert-year-value" for="alert-year" aria-hidden="true"></output>
+                <input id="alert-year" type="range" min="0" max="1" value="0" disabled>
+                <div class="range-ticks" id="alert-year-ticks" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="time-filter">
+              <label for="alert-month" data-i18n>Month</label>
+              <div class="range-ruler">
+                <output class="range-readout" id="alert-month-value" for="alert-month" aria-hidden="true"></output>
+                <input id="alert-month" type="range" min="0" max="1" value="0" disabled>
+                <div class="range-ticks" id="alert-month-ticks" aria-hidden="true"></div>
+              </div>
+            </div>
+        </div>
+        <p id="alert-source" class="card-caption alert-source"></p>
+        <div class="alert-layout">
+          <article class="card map-card" aria-label="Interactive alert map" data-i18n-attrs="aria-label">
+            <div class="map-frame">
+              <div id="alert-map" role="group" aria-label="Map of alerts for the selected region" data-i18n-attrs="aria-label"></div>
+              <div class="map-actions">
+                <button id="map-basemap" class="map-reset" type="button" aria-pressed="true" data-i18n>Satellite</button>
+                <button id="reset-map" class="map-reset" type="button" data-i18n>Reset view</button>
+              </div>
+              <p class="map-status" id="map-status" role="status" hidden></p>
+              <p class="basemap-status" id="basemap-status" role="status" hidden></p>
+            </div>
+            <ul class="map-legend" id="example-legend" aria-label="MODIS legend" data-i18n-attrs="aria-label">
+              <li data-i18n><span class="dot alert-key burned" aria-hidden="true"></span> Burned area detected</li>
+              <li data-i18n><span class="dot alert-key unburned" aria-hidden="true"></span> No burned area detected</li>
+              <li data-i18n><span class="dot alert-key no-data" aria-hidden="true"></span> No valid MODIS data</li>
+            </ul>
+            <ul class="map-legend" id="history-legend" aria-label="Historical anomaly legend" hidden data-i18n-attrs="aria-label">
+              <li data-i18n><span class="dot alert-key burned" aria-hidden="true"></span> Above the previous range for the same month</li>
+            </ul>
+          </article>
+          <aside class="alert-sidebar" aria-label="Alert summary and details" data-i18n-attrs="aria-label">
+            <section class="card summary-card">
+              <h3 data-i18n>Selected month</h3>
+              <div class="alert-totals" aria-live="polite">
+                <div>
+                  <strong id="alert-count">—</strong>
+                  <span id="alert-count-label" data-i18n>AI alerts</span>
+                </div>
+                <div id="modis-summary">
+                  <strong id="overlap-count">—</strong>
+                  <span id="overlap-label" data-i18n>MODIS overlap</span>
+                </div>
+              </div>
+              <p class="card-caption" id="overlap-detail" data-i18n>Share of alerts with valid MODIS data that overlap burned area.</p>
+            </section>
+            <section class="card detail-card">
+              <h3 data-i18n>Alert details</h3>
+              <p class="card-caption" id="point-instruction" data-i18n>Select a point to inspect its 0.1° grid cell.</p>
+              <label class="field field-point" for="point-picker">
+                <span class="sr-only" data-i18n>Select an alert point</span>
+                <select id="point-picker" disabled></select>
+              </label>
+              <p id="point-explanation" class="point-explanation" aria-live="polite" hidden></p>
+              <dl id="point-details" class="point-details" hidden></dl>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+
+      <section id="calendar-view" role="tabpanel" aria-labelledby="calendar-tab" hidden>
+        <div class="section-heading">
+          <div>
+            <h2 id="calendar-title" tabindex="-1" data-i18n>Historical calendar</h2>
+            <p id="calendar-selection" class="section-subtitle"></p>
+          </div>
+          <div class="controls calendar-period">
+            <label class="field" for="calendar-sensor">
+              <span data-i18n>Sensor</span>
+              <select id="calendar-sensor"></select>
+            </label>
+            <label class="field" for="calendar-satellite">
+              <span data-i18n>Satellite</span>
+              <select id="calendar-satellite"></select>
+            </label>
+            <div id="workspace-filters" class="controls" hidden>
+              <label class="field" id="workspace-stream">
+                <span data-i18n>Processing stream</span>
+                <select id="workspace-source"></select>
+              </label>
+              <label class="field">
+                <span data-i18n>File region</span>
+                <select id="workspace-region"></select>
+              </label>
+            </div>
+          </div>
+        </div>
+        <p id="calendar-data-status" class="card-caption calendar-notice" role="status" hidden></p>
+        <div id="calendar-content" hidden>
+          <div class="period-timeline" role="group" aria-label="Calendar period" data-i18n-attrs="aria-label">
+            <div class="time-filter">
+              <label for="calendar-year" data-i18n>Year</label>
+              <div class="range-ruler">
+                <output class="range-readout" id="calendar-year-value" for="calendar-year" aria-hidden="true"></output>
+                <input id="calendar-year" type="range" min="0" max="1" value="0" disabled>
+                <div class="range-ticks" id="calendar-year-ticks" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="time-filter">
+              <label for="calendar-month" data-i18n>Month</label>
+              <div class="range-ruler">
+                <output class="range-readout" id="calendar-month-value" for="calendar-month" aria-hidden="true"></output>
+                <input id="calendar-month" type="range" min="0" max="1" value="0" disabled>
+                <div class="range-ticks" id="calendar-month-ticks" aria-hidden="true"></div>
+              </div>
+            </div>
+          </div>
+          <p id="calendar-coverage" class="card-caption calendar-notice" role="status" hidden></p>
+          <div class="calendar-map-heading">
+            <div class="card-header">
+              <h3 data-i18n>Hotspot cells</h3>
+              <p class="card-caption" id="calendar-land-source" data-i18n>Land type uses the dominant ESA WorldCover 2021 class in each 0.5° cell.</p>
+            </div>
+            <button id="toggle-statistics" class="statistics-toggle" type="button" aria-expanded="false" aria-controls="calendar-statistics" data-i18n>STATISTICS</button>
+          </div>
+          <div class="calendar-layout">
+            <article class="card workspace-map" aria-label="Hotspot cells" data-i18n-attrs="aria-label">
+              <p id="workspace-map-status" class="card-caption" role="status" hidden></p>
+              <iframe id="workspace-map" title="Hotspot cells for the selected calendar period" hidden data-i18n-attrs="title"></iframe>
+            </article>
+            <div id="calendar-statistics" class="calendar-statistics" hidden>
+              <article class="card calendar-card">
+                <div class="card-header">
+                  <h3 data-i18n>Monthly detections by year</h3>
+                  <p class="card-caption" data-i18n>Select a year or a month cell to explore its annual trend.</p>
+                </div>
+                <div class="table-scroll" id="heatmap"></div>
+                <div class="heatmap-legend" role="group" aria-label="Heatmap scale" data-i18n-attrs="aria-label">
+                  <span>0</span><span class="heat-scale" aria-hidden="true"></span><span id="heat-maximum"></span>
+                  <span class="legend-empty" aria-hidden="true"></span><span data-i18n>No observation</span>
+                  <span id="calendar-estimate-key" hidden data-i18n><i aria-hidden="true"></i><span class="heat-value" aria-hidden="true">≈</span> MODIS estimate</span>
+                </div>
+              </article>
+              <article class="card calendar-card trend-card">
+                <div class="card-header">
+                  <h3 id="trend-title" data-i18n>Monthly trend</h3>
+                  <div class="calendar-totals">
+                    <div><strong id="year-total">—</strong><span id="year-total-label" data-i18n>Detections</span></div>
+                    <div><strong id="peak-month">—</strong><span data-i18n>Peak month</span></div>
+                  </div>
+                </div>
+                <canvas id="trend" role="img" aria-label="Monthly counts and historical median. Values are listed in the comparison table." data-i18n-attrs="aria-label"></canvas>
+                <ul class="map-legend trend-legend" aria-label="Trend legend" data-i18n-attrs="aria-label">
+                  <li data-i18n><span class="dot burned"></span> Detections</li>
+                  <li id="median-key" data-i18n><span class="dot unburned"></span> Historical median</li>
+                </ul>
+              </article>
+              <article class="card baseline-card">
+              <div class="card-header baseline-header">
+                <div>
+                  <h3 data-i18n>Historical comparison</h3>
+                  <p class="card-caption" id="reference-label"></p>
+                </div>
+                <button id="download" class="quiet-button" type="button" data-i18n>Download CSV <span aria-hidden="true">↓</span></button>
+              </div>
+              <p id="history-notice" class="history-notice" hidden></p>
+              <p id="workspace-month-flag" class="history-notice" role="status" hidden></p>
+              <div id="baseline-table" class="table-scroll"></div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div class="footer-main">
+        <div class="footer-identity">
+          <p class="footer-title">Sutellite</p>
+          <p data-i18n>Fire Activity Atlas</p>
+          <p class="footer-sources">NASA FIRMS · MODIS MCD64A1 · ESA WorldCover 2021</p>
+        </div>
+        <form class="suggestion-form" id="suggestion-form" method="post" action="/api/suggestions">
+          <label for="suggestion-message" data-i18n>Suggestions</label>
+          <textarea id="suggestion-message" name="message" rows="3" maxlength="500" required placeholder="What would you improve?" data-i18n-attrs="placeholder"></textarea>
+          <div class="suggestion-actions">
+            <button class="suggestion-submit" type="submit" data-i18n>Send suggestion</button>
+            <p id="suggestion-status" role="status"></p>
+          </div>
+        </form>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Sutellite</p>
+        <div class="footer-verification">
+          <span data-i18n><span class="verification-mark" aria-hidden="true">✓</span> HTML verified</span>
+          <span data-i18n><span class="verification-mark" aria-hidden="true">✓</span> CSS verified</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <dialog id="methodology" aria-labelledby="methodology-title">
+    <div class="dialog-content">
+      <div class="dialog-heading">
+        <h2 id="methodology-title" data-i18n>About the data</h2>
+        <form method="dialog"><button class="quiet-button" autofocus data-i18n>Close</button></form>
+      </div>
+      <h3 data-i18n>Historical calendar</h3>
+      <p data-i18n>The NASA FIRMS archive covers 2000–2025 across eight regions. Select a satellite to see its own observations. The harmonized series uses MODIS estimates on the VIIRS S-NPP scale through January 2012 and S-NPP observations from February 2012. The regional calibration uses the 2013–2022 overlap. Early cell counts are proportional estimates. Historical comparisons use at least three earlier years with observations for the same month and source.</p>
+      <h3 data-i18n>Uploaded files and hotspot cells</h3>
+      <p data-i18n>Upload a UTF-8 CSV or Parquet. Each source and region has its own calendar and spatial summary. The comparison uses available earlier years in the same file. Detections with locations are drawn in 0.5° cells. The archive uses the dominant class from the ESA WorldCover 2021 reference in each cell. A class is available for uploaded detections in cells covered by the site’s lookup.</p>
+      <p data-i18n>Contains modified Copernicus Sentinel data (2021) processed by the ESA WorldCover consortium. <a href="https://doi.org/10.5281/zenodo.7254221">ESA WorldCover 2021 v200</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
+      <h3 data-i18n>Historical anomalies</h3>
+      <p data-i18n>The historical map uses the MODIS Terra and Aqua and VIIRS S-NPP archive in canonical_v1.1. Earlier MODIS counts are estimated on the VIIRS S-NPP scale using the 2013–2022 overlap. Those estimates use regional ratios, so the earlier points are approximate at grid-cell level. A hotspot is a satellite detection.</p>
+      <p data-i18n>Each 0.1° cell is compared with the same calendar month in earlier years with usable detections. A point is marked when the low estimate exceeds the highest earlier upper estimate, using at least three earlier years. VIIRS counts are used directly. Months with no records have unknown coverage. January 2012 uses MODIS because VIIRS S-NPP started partway through the month.</p>
+      <h3 data-i18n>2024–2025 AI results</h3>
+      <p data-i18n>The original Isolation Forest results use the 2013–2023 VIIRS S-NPP history. An alert also exceeds its historical maximum.</p>
+      <h3 data-i18n>Burned area and land cover</h3>
+      <p data-i18n>Each point marks a grid cell center. In the 2024–2025 AI results, the MODIS category indicates whether burned area was mapped within the cell for that month. ESA WorldCover 2021 provides the land cover class. The satellite basemap shows a reference view of the terrain.</p>
+      <p class="source-line" data-i18n>Sources <a href="https://firms.modaps.eosdis.nasa.gov/">NASA FIRMS</a> · <a href="https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MCD64A1">MODIS MCD64A1</a> · <a href="https://esa-worldcover.org/">ESA WorldCover</a> · <a href="https://www.naturalearthdata.com/">Natural Earth</a></p>
+    </div>
+  </dialog>
+
+</body>
+</html>

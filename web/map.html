@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title data-i18n>Sutellite – hotspot map (2D / 2.5D)</title>
+<link rel="stylesheet" href="typography.css">
+<link rel="stylesheet" href="palette.css">
+<script src="accessibility.js"></script>
+<script src="translations.js"></script>
+<script src="i18n.js"></script>
+<script>
+const mapParameters = new URLSearchParams(location.search);
+if (mapParameters.has("embed")) {
+  document.documentElement.classList.add("embedded");
+  document.documentElement.dataset.theme = mapParameters.get("theme") === "light" ? "light" : "dark";
+}
+</script>
+<style>
+:root{--bg:var(--cream);--fg:var(--ink);--mut:#574e4b;--card:#f6f3f1;--line:#c4bdb9;--acc:var(--coral);--emphasis:#a63823;--grid:#c9c4c0;--land:#dddedc;--land-line:#969591;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:var(--page);--fg:var(--text);--mut:var(--muted);--card:var(--surface);--line:var(--border);--emphasis:var(--sky);--grid:var(--map-grid);--land:var(--map-land);--land-line:var(--map-line);color-scheme:dark}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--sans)}
+main{max-width:1000px;margin:0 auto;padding:16px}h1,h2{font-family:var(--heading)}h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1rem;margin:0 0 8px}
+.sub{color:var(--mut);margin:0 0 12px}
+.warn{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:.9rem}
+.warn.ok{border-left-color:var(--emphasis)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:10px}
+label,.view-control{display:flex;flex-direction:column;font-size:.8rem;color:var(--mut);gap:2px}
+select,button,input[type=file]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+:focus-visible{outline:2px solid var(--emphasis);outline-offset:2px}
+.seg{display:inline-flex}.seg button{border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}
+.seg button[aria-pressed=true]{background:var(--acc);color:var(--ink);border-color:var(--acc)}
+canvas{width:100%;height:440px;display:block;border:1px solid var(--line);border-radius:6px;touch-action:none;background:var(--bg);cursor:grab}
+#detail{min-height:3em;margin-top:8px;font-size:.9rem}
+.leg{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:.8rem;color:var(--mut);margin-top:8px}
+.bar{height:10px;width:160px;border-radius:2px}
+.bi{display:grid;grid-template-columns:repeat(3,16px);gap:1px}.bi i{width:16px;height:16px;display:block}
+.pattern-key i{position:relative}
+.pattern-key i::after{content:"";position:absolute;inset:7px 3px auto;border-top:1px solid currentColor}
+.pattern-key i[data-stripes="0"]::after{display:none}
+.pattern-key i[data-stripes="2"]::after{inset:5px 3px auto;height:6px;border-bottom:1px solid currentColor}
+.land-table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.85rem}td,th{padding:4px 6px;text-align:left}th{color:var(--mut);font-weight:500}
+tr.r{cursor:pointer}tr.r:hover{background:color-mix(in srgb,var(--acc) 10%,transparent)}tr.r.off{opacity:.4}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.land-code{display:none}
+:root[data-color-vision] .land-code{display:inline;font-variant-numeric:tabular-nums}
+.sh{height:8px;background:var(--acc);border-radius:2px}
+.chips{display:inline-flex;flex-wrap:wrap;gap:4px}.chips button{padding:3px 9px;border-radius:14px;font-size:.8rem}.chips button[aria-pressed=true]{background:var(--acc);color:var(--ink);border-color:var(--acc)}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.75rem;border:1px solid var(--line)}
+:root.embedded{--bg:var(--page);--fg:var(--text);--mut:var(--muted);--card:var(--surface);--line:var(--border);--emphasis:var(--cool-text);--grid:var(--map-grid);--land:var(--map-land);--land-line:var(--map-line);color-scheme:dark}
+:root.embedded[data-theme="light"]{color-scheme:light}
+.embedded main{max-width:none;padding:0 1px 1px}
+.embedded h1,.embedded #intro,.embedded .standalone,.embedded #flt{display:none!important}
+.embedded canvas{height:clamp(310px,55vh,455px);background:var(--map-water)}
+@media (max-width:460px){.embedded td,.embedded th{padding-inline:4px}.embedded table{font-size:.75rem}.embedded .sw{margin-right:4px}}
+</style>
+</head>
+<body>
+<main>
+<h1 data-i18n>Sutellite – hotspot map <span class="tag" data-i18n>preview</span></h1>
+<p class="sub" id="intro" data-i18n>Classify cells by number of detections, fire radiative power (FRP) and land type. Switch between a flat 2D map and an extruded 2.5D view.</p>
+<div id="banner" class="warn"></div>
+<div class="card">
+<div class="row">
+<div class="view-control" data-i18n>View<span class="seg" role="group" aria-label="View mode" data-i18n-attrs="aria-label"><button id="b2" aria-pressed="true" type="button">2D</button><button id="b25" aria-pressed="false" type="button">2.5D</button></span></div>
+<label class="standalone" data-i18n>Region<select id="region"></select></label>
+<label data-i18n>Colour by<select id="mode"><option value="bi" data-i18n>Count × FRP (classes)</option><option value="n" data-i18n>Number of detections</option><option value="f" data-i18n>Fire power (mean FRP)</option><option value="lc" data-i18n>Land type</option></select></label>
+<label data-i18n>Height (2.5D)<select id="hm"><option value="n" data-i18n>Detections</option><option value="f" data-i18n>Mean FRP</option></select></label>
+<label class="standalone" data-i18n>Load map_cells.json (v2)<input id="file" type="file" accept=".json,application/json"></label>
+<label class="standalone" data-i18n>Base map (land.json)<input id="landfile" type="file" accept=".json,application/json"></label>
+</div>
+<div class="row" id="flt" style="display:none"><label data-i18n>From year<select id="y0"></select></label><label data-i18n>To year<select id="y1"></select></label>
+<label data-i18n>Sensor<span class="chips" id="cs"></span></label><label data-i18n>Satellite<span class="chips" id="cp"></span></label><label data-i18n>Stream<span class="chips" id="ct"></span></label></div>
+<div id="sel" class="sub" style="margin:0 0 6px" role="status"></div><div id="mix" class="warn" style="display:none"></div>
+<canvas id="cv" aria-label="Map of hotspot cells; use the table below for land-type totals" data-i18n-attrs="aria-label"></canvas>
+<div class="leg" id="leg"></div>
+<div id="detail" aria-live="polite" data-i18n>Hover a cell for details. 2D: drag to pan. 2.5D: drag to rotate and tilt. Scroll to zoom.</div>
+</div>
+<div class="card"><h2 id="land-summary" data-i18n>Land type: share of detections and fire power</h2>
+<div class="land-table-scroll">
+<table><thead><tr><th data-i18n>Land type (click to show / hide)</th><th data-i18n>Cells</th><th data-i18n>Detections</th><th style="width:30%" data-i18n>Share</th><th data-i18n>Mean FRP</th></tr></thead><tbody id="tb"></tbody></table>
+</div></div>
+</main>
+<script>
+const REG={"angola":[-18.03,-4.4,11.83,24.06],"australia":[-43.59,-9.37,113.42,153.62],"brasil":[-33.74,5.21,-73.86,-32.42],"california":[32.55,42.01,-124.39,-114.14],"espana":[27.72,43.71,-18.15,4.27],"indonesia":[-10.98,5.88,95.02,140.98],"rdc":[-13.46,5.37,12.21,31.26],"zambia":[-18.06,-8.22,21.98,33.67]},NM={angola:'Angola',australia:'Australia',brasil:'Brazil',california:'California',espana:'Spain',indonesia:'Indonesia',rdc:'DR Congo',zambia:'Zambia'};
+const LC={0:['No data','#777777'],10:['Tree cover','#117733'],20:['Shrubland','#999933'],30:['Grassland','#DDCC77'],40:['Cropland','#CC6677'],50:['Built-up','#882255'],60:['Bare / sparse','#AA4499'],70:['Snow / ice','#88CCEE'],80:['Water','#332288'],90:['Herbaceous wetland','#44AA99'],95:['Mangroves','#009988'],100:['Moss / lichen','#BBBBBB']};
+const VIR=['#243849','#315a73','#4184a0','#5bc3eb','#9ed5eb','#ede6e3'],MAG=['#352a2c','#673832','#a84a38','#f06449','#ff9d8b','#ede6e3'];
+const BI=[['#dadad9','#95cfe4','#5bc3eb'],['#f4b2a4','#b49ba3','#3d91b9'],['#f06449','#b24e43','#574360']],TN=['Low','Medium','High'];
+const BLUE_LEVELS=['#d6effc','#71afd6','#1c5285'];
+const AMBER_LEVELS=['#fff2cb','#ffc25a','#b36314','#723300'];
+const root=document.documentElement;
+const {t,text,periodName,numberFormat}=window.sutelliteI18n;
+const fmt=numberFormat({maximumFractionDigits:0}).format;
+const oneDecimal=numberFormat({minimumFractionDigits:1,maximumFractionDigits:1,useGrouping:false}).format;
+const displayDegrees=numberFormat({maximumFractionDigits:2,useGrouping:false}).format;
+const embedded=root.classList.contains("embedded");
+const colorVision=()=>root.hasAttribute('data-color-vision');
+const $=id=>document.getElementById(id),hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+function ramp(S,t){t=Math.max(0,Math.min(1,t));const x=t*(S.length-1),i=Math.min(S.length-2,Math.floor(x)),f=x-i,a=hex(S[i]),b=hex(S[i+1]);return a.map((v,k)=>v+(b[k]-v)*f)}
+const qn=(a,p)=>a.length?a[Math.min(a.length-1,Math.floor(p*a.length))]:0;
+const hid=new Set(),active={has:k=>!hid.has(k),delete:k=>hid.add(k),add:k=>hid.delete(k)};
+let cells=[],deg=1,vis=[],drawn=[],view=null,m25=false,mx={n:1,f:1},q={n:[0,0],f:[0,0]},G=null;const F={y0:0,y1:9999,month:null,pl:new Set(),st:new Set(),measure:"observed"};
+const st={yaw:0,pitch:Math.PI/2,ty:0,tp:Math.PI/2,zoom:1,px:0,py:0};
+const approx=n=>(F.measure==="observed"?"":"≈")+fmt(n);
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const PN={TERRA:'Terra',AQUA:'Aqua',SNPP:'S-NPP'};
+function synthG(){const r=rng(7),cs=[],c=[],k=[],n=[],f=[],Y0=[2000,2002,2012,2018,2023];
+ for(const key in REG){const [a,b,c0,d]=REG[key];for(let la=Math.floor(a);la<b;la++)for(let lo=Math.floor(c0);lo<d;lo++){const s1=.5+.5*Math.sin(la*.37+1)*Math.cos(lo*.29+2),s2=.5+.5*Math.sin(la*.21+lo*.17);if(r()>.15+.8*s1)continue;
+  const id=cs.length,base=Math.exp(1.5+5*s1+1.3*r()),fr=10+45*s1*s1+18*r();cs.push([la,lo,s2<.2?30:s2<.4?20:s2<.6?10:s2<.8?40:60]);
+  for(let y=2000;y<=2025;y++)for(let p=0;p<5;p++){if(y<Y0[p])continue;c.push(id);k.push(y*100+p*10);n.push(Math.max(1,Math.round(base*(p<2?.15:1)*(.6+.8*r()))));f.push(Math.round(fr*(p<2?.8:1)*10))}}}
+ return{cells:cs,c,k,n,f,plats:['TERRA','AQUA','SNPP','NOAA-20','NOAA-21'],sensorOf:{TERRA:'MODIS',AQUA:'MODIS',SNPP:'VIIRS','NOAA-20':'VIIRS','NOAA-21':'VIIRS'},streams:['ARCHIVE','NRT'],deg:1,total:n.reduce((s,v)=>s+v,0),y0:2000,y1:2025}}
+const pl=p=>PN[p]||p,chip=(a,l,on)=>'<button type="button" data-'+a+' aria-pressed="'+on+'">'+l+'</button>';
+function loadG(g,msg,ok,period=null){G=g;F.month=period?.month??null;F.measure=period?.measure??"observed";deg=g.deg;hid.clear();F.y0=g.y0;F.y1=g.y1;F.pl=new Set(g.plats.map((_,i)=>i));const ai=g.streams.indexOf('ARCHIVE');F.st=embedded?new Set(g.streams.map((_,i)=>i)):new Set([ai<0?0:ai]);
+ const yo=[];for(let y=g.y0;y<=g.y1;y++)yo.push(y);['y0','y1'].forEach(id=>{$(id).innerHTML=yo.map(y=>'<option>'+y+'</option>').join('')});F.y0=F.y1=period?.year??g.y0;if(!period)F.y1=g.y1;$('y0').value=F.y0;$('y1').value=F.y1;
+ $('flt').style.display='';$('banner').className='warn'+(ok?' ok':'');$('banner').textContent=msg;if(ok)rs.value=embedded?'all':'world';st.zoom=1;st.px=st.py=0;drawChips();refilter()}
+function drawChips(){const sens=[...new Set(G.plats.map(p=>G.sensorOf[p]))];
+ $('cs').innerHTML=sens.map(s=>chip('s="'+s+'"',s,G.plats.filter(p=>G.sensorOf[p]===s).every(p=>F.pl.has(G.plats.indexOf(p))))).join('');
+ $('cp').innerHTML=G.plats.map((p,i)=>chip('p="'+i+'"',pl(p),F.pl.has(i))).join('');
+ $('ct').innerHTML=G.streams.map((s,i)=>chip('t="'+i+'"',t(s==='NRT'?'NRT (near real time)':s==='ARCHIVE'?'Archive':s),F.st.has(i))).join('')}
+function tg(S,v){S.has(v)?S.delete(v):S.add(v)}
+$('flt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!G)return;const d=b.dataset;
+ if('s' in d){const ids=G.plats.map((p,i)=>G.sensorOf[p]===d.s?i:-1).filter(i=>i>=0),all=ids.every(i=>F.pl.has(i));ids.forEach(i=>all?F.pl.delete(i):F.pl.add(i))}
+ else if('p' in d)tg(F.pl,+d.p);else if('t' in d)tg(F.st,+d.t);drawChips();refilter()});
+['y0','y1'].forEach(id=>$(id).addEventListener('change',()=>{F.y0=+$('y0').value;F.y1=+$('y1').value;if(F.y0>F.y1){[F.y0,F.y1]=[F.y1,F.y0];$('y0').value=F.y0;$('y1').value=F.y1}refilter()}));
+function refilter(){const nC=G.cells.length,N=new Float64Array(nC),FS=new Float64Array(nC),FW=new Float64Array(nC);
+ for(let i=0,L=G.n.length;i<L;i++){
+  const key=G.k[i],period=Math.floor(key/100),year=G.monthly?Math.floor(period/100):period;
+  const platform=Math.floor(key/10)%10,stream=key%10;
+  if(year<F.y0||year>F.y1||(G.monthly&&F.month&&period%100!==F.month)||!F.pl.has(platform)||!F.st.has(stream))continue;
+  const c=G.c[i],n=G.n[i];N[c]+=n;const f=G.f[i],weight=G.w?.[i]??n;
+  if(f>=0){FS[c]+=f/10*weight;FW[c]+=weight}
+ }
+ cells=[];for(let c=0;c<nC;c++)if(N[c]>0){const g=G.cells[c];cells.push({lat:g[0],lon:g[1],n:N[c],f:FW[c]?FS[c]/FW[c]:null,weight:FW[c],lc:g[2]})}
+ renderFilterSummary();compute()}
+
+function renderFilterSummary(){
+ const total=cells.reduce((sum,cell)=>sum+cell.n,0);
+ const selection=F.y0===F.y1?periodName(F.y0,F.month):F.y0+'–'+F.y1;
+ const description=F.measure==='estimated'?'{total} estimated detections in {cells}'
+  :F.measure==='mixed'?'{total} detections (includes MODIS estimates) in {cells}'
+  :total===1?'{total} detection record in {cells}':'{total} detection records in {cells}';
+ const count=t(cells.length===1?'{count} cell':'{count} cells',{count:fmt(cells.length)});
+ $('land-summary').textContent=t(F.measure==='observed'?'Land type: share of detections and fire power':'Land type: share of harmonized detections and fire power');
+ $('sel').textContent=(total?t(description,{total:approx(total),cells:count}):t('No mapped detections'))+' · '+selection;
+ const sensors=new Set([...F.pl].map(i=>G.sensorOf[G.plats[i]]));
+ const mix=$('mix');
+ mix.style.display=sensors.size>1?'':'none';
+ mix.innerHTML=t('MODIS and VIIRS are both selected. Their counts are {emphasis} (different resolution and sensitivity), so use one sensor when comparing places or years. The harmonized calendar combines them.',{
+  emphasis:'<strong>'+t('not comparable')+'</strong>',
+ });
+}
+const rs=$('region');const WORLD=[-58,84,-180,180];let land=[];
+const regionOptions={world:'World map',all:'All regions (fit to data)',...NM};
+for(const [id,name] of Object.entries(regionOptions))rs.add(new Option(t(name),id));
+function compute(){
+ const rg=rs.value;let box=rg==='world'?WORLD:REG[rg];const inb=c=>{const la=c.lat+deg/2,lo=c.lon+deg/2;return !box||(la>=box[0]&&la<=box[1]&&lo>=box[2]&&lo<=box[3])};
+ if(!box){box=null}const base=cells.filter(inb);
+ const bb=box||base.reduce((b,c)=>[Math.min(b[0],c.lat),Math.max(b[1],c.lat+deg),Math.min(b[2],c.lon),Math.max(b[3],c.lon+deg)],[90,-90,180,-180]);
+ if(!base.length){vis=[];table(base);draw();return}
+ const la0=(bb[0]+bb[1])/2,kx=rg==='world'?1:Math.cos(la0*Math.PI/180);view={bb,lat0:la0,lon0:(bb[2]+bb[3])/2,kx,w:(bb[3]-bb[2])*kx,h:bb[1]-bb[0]};
+ table(base);vis=base.filter(c=>active.has(c.lc));
+ const ns=vis.map(c=>c.n).sort((a,b)=>a-b),fs=vis.filter(c=>c.f!=null).map(c=>c.f).sort((a,b)=>a-b);
+ mx={n:ns[ns.length-1]||1,f:qn(fs,.98)||1};q={n:[qn(ns,1/3),qn(ns,2/3)],f:[qn(fs,1/3),qn(fs,2/3)]};
+ colour();draw()}
+const tc=(v,c)=>v<=c[0]?0:v<=c[1]?1:2;
+function colorScale(mode) {
+ if(mode==='n')return colorVision() ? BLUE_LEVELS : VIR;
+ return colorVision() ? AMBER_LEVELS : MAG;
+}
+function colour(){const m=$('mode').value,accessible=colorVision(),scale=colorScale(m);vis.forEach(c=>{
+ c.ti=[tc(c.n,q.n),c.f==null?0:tc(c.f,q.f)];
+ if(m==='n')c.rgb=ramp(scale,Math.sqrt(c.n/mx.n));
+ else if(m==='f')c.rgb=accessible&&c.f==null?hex(LC[0][1]):ramp(scale,Math.sqrt((c.f||0)/mx.f));
+ else if(m==='lc')c.rgb=hex((LC[c.lc]||LC[0])[1]);
+ else c.rgb=hex(accessible?BLUE_LEVELS[c.ti[0]]:BI[c.ti[1]][c.ti[0]]);
+ });legend(m)}
+function legend(m){const L=$('leg');
+ if(m==='n'||m==='f'){
+  const scale=colorScale(m);
+  const maximum=m==='n'?t(mx.n===1?'{count} detection':'{count} detections',{count:fmt(mx.n)}):t('{value} MW, 98th pct.',{value:fmt(mx.f)});
+  L.innerHTML='<span>'+t('Low')+'</span><span class="bar" style="background:linear-gradient(90deg,'+scale.join(',')+')"></span><span>'+t('High')+' ('+maximum+')</span>';
+  if(colorVision()&&m==='f')L.insertAdjacentHTML('beforeend','<span>'+t('× marks missing FRP.')+'</span>');
+ }
+ else if(m==='lc')L.textContent=t(colorVision()?'Land-type codes match the table below. Hover a cell or zoom in to read its code.':'Colours: see land-type table below');
+ else if(colorVision()){
+  const key=[2,1,0].map(stripes=>BLUE_LEVELS.map(fill=>'<i data-stripes="'+stripes+'" style="background:'+fill+';color:'+symbolInk(hex(fill))+'"></i>').join('')).join('');
+  L.innerHTML='<span class="bi pattern-key" aria-hidden="true">'+key+'</span><span>'+t('Darker blue means more detections. No stripe, one stripe and two stripes mark low, medium and high FRP. × marks missing FRP.')+'</span>';
+ }
+ else L.innerHTML='<span class="bi" aria-hidden="true">'+[2,1,0].map(r=>BI[r].map(c=>'<i style="background:'+c+'"></i>').join('')).join('')+'</span><span>'+t('→ more detections (terciles) · ↑ higher FRP (terciles)')+'</span>'}
+function table(base){const g={};base.forEach(c=>{const o=g[c.lc]||(g[c.lc]={k:0,n:0,fw:0,w:0});o.k++;o.n+=c.n;if(c.f!=null){o.fw+=c.f*c.weight;o.w+=c.weight}});
+ const tot=Object.values(g).reduce((s,o)=>s+o.n,0)||1;
+ $('tb').innerHTML=Object.keys(g).sort((a,b)=>g[b].n-g[a].n).map(k=>{const o=g[k],l=LC[k]||LC[0],code=LC[k]?k:0,share=100*o.n/tot;return '<tr class="r'+(active.has(+k)?'':' off')+'" data-k="'+k+'" tabindex="0" role="button" aria-pressed="'+active.has(+k)+'"><td><span class="sw" style="background:'+l[1]+'"></span><span class="land-code">'+code+' · </span>'+t(l[0])+'</td><td>'+fmt(o.k)+'</td><td>'+approx(o.n)+'</td><td><div class="sh" style="width:'+share.toFixed(1)+'%"></div>'+oneDecimal(share)+'%</td><td>'+(o.w?oneDecimal(o.fw/o.w)+' MW':'–')+'</td></tr>'}).join('')}
+function toggle(k){active.has(k)?active.delete(k):active.add(k);compute()}
+$('tb').addEventListener('click',e=>{const r=e.target.closest('tr.r');if(r)toggle(+r.dataset.k)});
+$('tb').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const r=e.target.closest('tr.r');if(r){e.preventDefault();toggle(+r.dataset.k)}}});
+
+function symbolInk([r,g,b]) {
+ return .2126*r+.7152*g+.0722*b>142?'#0d1b29':'#fff';
+}
+
+function interpolate(a,b,t) {
+ return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+}
+
+function drawCellSymbol(ctx,cell,face,mode,fontSize,fontFamily) {
+ const [a,b,c,d]=face;
+ const ink=symbolInk(cell.rgb);
+ if(mode==='lc'){
+  const code=String(LC[cell.lc]?cell.lc:0);
+  const width=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  const height=Math.hypot(d[0]-a[0],d[1]-a[1]);
+  if(width<fontSize*.64*code.length||height<fontSize)return;
+  ctx.fillStyle=ink;
+  ctx.font='700 '+fontSize+'px '+fontFamily;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText(code,...interpolate(a,c,.5));
+  return;
+ }
+ const stripes=cell.ti[1];
+ if(mode==='n'||(cell.f!=null&&(mode==='f'||!stripes)))return;
+ ctx.strokeStyle=ink;
+ ctx.lineWidth=1.15;
+ ctx.beginPath();
+ if(cell.f==null){
+  ctx.moveTo(...interpolate(a,c,.2));ctx.lineTo(...interpolate(a,c,.8));
+  ctx.moveTo(...interpolate(b,d,.2));ctx.lineTo(...interpolate(b,d,.8));
+ }else{
+  for(const position of stripes===1?[.5]:[.29,.71]){
+   const left=interpolate(a,d,position),right=interpolate(b,c,position);
+   ctx.moveTo(...interpolate(left,right,.15));ctx.lineTo(...interpolate(left,right,.85));
+  }
+ }
+ ctx.stroke();
+}
+
+function draw(){const cv=$('cv'),dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}
+ const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);drawn=[];if(!vis.length||!view)return;
+ const sc=Math.min(W/view.w,H/view.h)*.85*st.zoom,flat=st.pitch>1.55,cy=Math.cos(st.yaw),sy=Math.sin(st.yaw),sP=Math.sin(st.pitch),cP=Math.cos(st.pitch);
+ const ox=W/2+st.px,oy=H/2+st.py+(flat?0:H*.1),ext=Math.max(view.w,view.h),hk=$('hm').value,hm=hk==='n'?mx.n:mx.f;
+ const P=(X,Y,Z)=>{const rx=X*cy-Y*sy,ry=X*sy+Y*cy;return[ox+sc*rx,oy-sc*(ry*sP+Z*cP),ry]};
+ const items=vis.map(c=>{const X0=(c.lon-view.lon0)*view.kx,Y0=c.lat-view.lat0;return{c,X0,Y0,d:(X0+deg*view.kx/2)*sy+(Y0+deg/2)*cy}}).sort((a,b)=>b.d-a.d);
+ const accessible=colorVision(),mode=$('mode').value,fontSize=root.hasAttribute('data-dyslexia')?13:11;
+ const poly=(pts,col,sh)=>{x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();const s='rgb('+col.map(v=>Math.round(v*sh)).join(',')+')';x.fillStyle=s;x.strokeStyle=accessible&&sh===1?'#f5f8fca8':s;x.lineWidth=.6;x.fill();x.stroke()};
+ const theme=getComputedStyle(cv),bb=view.bb,stp=view.h>100?30:view.h>30?10:5,gx=lo=>(lo-view.lon0)*view.kx,gy=la=>la-view.lat0;
+ const fontFamily=theme.getPropertyValue('--sans').trim();
+ x.lineWidth=.8;x.strokeStyle=theme.getPropertyValue('--grid').trim();x.beginPath();
+ for(let la=Math.ceil(bb[0]/stp)*stp;la<=bb[1];la+=stp){const a=P(gx(bb[2]),gy(la),0),b=P(gx(bb[3]),gy(la),0);x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1])}
+ for(let lo=Math.ceil(bb[2]/stp)*stp;lo<=bb[3];lo+=stp){const a=P(gx(lo),gy(bb[0]),0),b=P(gx(lo),gy(bb[1]),0);x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1])}x.stroke();
+ x.fillStyle=theme.getPropertyValue('--land').trim();x.strokeStyle=theme.getPropertyValue('--land-line').trim();x.lineWidth=.7;
+ for(const r of land){x.beginPath();r.forEach((p,i)=>{const q=P(gx(p[0]),gy(p[1]),0);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.closePath();x.fill();x.stroke()}
+ for(const it of items){const c=it.c,X1=it.X0+deg*view.kx,Y1=it.Y0+deg,hv=hk==='n'?c.n:(c.f||0),Z=flat?0:Math.sqrt(hv/hm)*.35*ext;
+  const b=[P(it.X0,it.Y0,0),P(X1,it.Y0,0),P(X1,Y1,0),P(it.X0,Y1,0)],t=Z>0?[P(it.X0,it.Y0,Z),P(X1,it.Y0,Z),P(X1,Y1,Z),P(it.X0,Y1,Z)]:b;
+  if(Z>0){[[0,1,-cy],[1,2,sy],[2,3,cy],[3,0,-sy]].forEach(([i,j,v])=>{if(v<-1e-6){const pg=[b[i],b[j],t[j],t[i]];poly(pg,c.rgb,.7);drawn.push([pg,c])}})}
+  poly(t,c.rgb,1);
+  if(accessible)drawCellSymbol(x,c,t,mode,fontSize,fontFamily);
+  drawn.push([t,c])}}
+function inPoly(p,x,y){let r=false;for(let i=0,j=p.length-1;i<p.length;j=i++){if((p[i][1]>y)!==(p[j][1]>y)&&x<(p[j][0]-p[i][0])*(y-p[i][1])/(p[j][1]-p[i][1])+p[i][0])r=!r}return r}
+function tick(){st.yaw+=(st.ty-st.yaw)*.18;st.pitch+=(st.tp-st.pitch)*.18;if(Math.abs(st.ty-st.yaw)>.002||Math.abs(st.tp-st.pitch)>.002){draw();requestAnimationFrame(tick)}else{st.yaw=st.ty;st.pitch=st.tp;draw()}}
+function setMode(on){m25=on;$('b2').setAttribute('aria-pressed',!on);$('b25').setAttribute('aria-pressed',on);st.ty=on?-.5:0;st.tp=on?.95:Math.PI/2;if(!on){st.px=st.py=0}tick()}
+$('b2').onclick=()=>setMode(false);$('b25').onclick=()=>setMode(true);
+['mode','hm'].forEach(i=>$(i).addEventListener('change',()=>{colour();draw()}));rs.addEventListener('change',()=>{st.zoom=1;st.px=st.py=0;compute()});
+const cv=$('cv');let dr=null,hoveredCell=null;
+function showCellDetail(cell){
+ if(!cell){text($('detail'),'Hover a cell for details.');return}
+ const name=t((LC[cell.lc]||LC[0])[0]);
+ const landType=colorVision()&&$('mode').value==='lc'?name+' ('+(LC[cell.lc]?cell.lc:0)+')':name;
+ const frpClass=t(colorVision()&&cell.f==null?'Unavailable':TN[cell.ti[1]]).toLocaleLowerCase();
+ const detections=t(cell.n===1?'{count} detection':'{count} detections',{count:approx(cell.n)});
+ $('detail').innerHTML='<strong>'+oneDecimal(cell.lat)+'°, '+oneDecimal(cell.lon)+'°</strong> '+t('(cell corner, {size}°) · {detections} · mean FRP {power} · {land}',{
+  size:displayDegrees(deg),detections,power:cell.f==null?'–':oneDecimal(cell.f)+' MW',land:landType,
+ })+'<br>'+t('Class: count {count}, FRP {power}',{count:t(TN[cell.ti[0]]).toLocaleLowerCase(),power:frpClass});
+}
+cv.addEventListener('pointerdown',e=>{dr=[e.clientX,e.clientY];cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing'});
+cv.addEventListener('pointerup',()=>{dr=null;cv.style.cursor='grab'});
+cv.addEventListener('pointermove',e=>{if(dr){const dx=e.clientX-dr[0],dy=e.clientY-dr[1];dr=[e.clientX,e.clientY];
+  if(m25){st.ty+=dx*.008;st.yaw=st.ty;st.tp=Math.max(.45,Math.min(1.35,st.tp-dy*.006));st.pitch=st.tp}else{st.px+=dx;st.py+=dy}draw();return}
+ const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;let h=null;for(let i=drawn.length-1;i>=0;i--)if(inPoly(drawn[i][0],px,py)){h=drawn[i][1];break}
+ hoveredCell=h;showCellDetail(h);});
+cv.addEventListener('wheel',e=>{e.preventDefault();st.zoom=Math.max(.5,Math.min(30,st.zoom*(e.deltaY<0?1.12:.89)));draw()},{passive:false});
+addEventListener('resize',draw);
+document.addEventListener('sutellite-accessibility-change',()=>{colour();draw()});
+document.addEventListener('sutellite-language-change',()=>{
+ for(const option of rs.options)option.text=t(regionOptions[option.value]);
+ if(G){drawChips();renderFilterSummary();compute()}
+ if(hoveredCell)showCellDetail(hoveredCell);
+});
+function unpackMap(data) {
+ const {meta,rec,cells}=data;
+ if(meta?.version!==2||!Array.isArray(cells)||!Array.isArray(rec?.k))throw new Error("Invalid map data.");
+ return {cells,c:rec.c,k:rec.k,n:rec.n,f:rec.f,w:rec.w,monthly:meta.period==="month",
+  plats:meta.platforms,sensorOf:meta.sensor_of,streams:meta.streams,deg:meta.cell_deg,
+  total:meta.total_records,y0:meta.years[0],y1:meta.years[1]};
+}
+$('file').addEventListener('change',async e=>{
+ const file=e.target.files[0];if(!file)return;
+ try{
+  const data=JSON.parse(await file.text()), map=unpackMap(data);
+  loadG(map,'',true);
+  text($('banner'),'Loaded {total} detection records in {cells} cells.',{total:fmt(map.total),cells:fmt(map.cells.length)});
+ }catch{ $('banner').className='warn';text($('banner'),'That file is not a valid map_cells.json v2.') }
+});
+$('landfile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const j=JSON.parse(await f.text());if(!Array.isArray(j.rings))throw 0;land=j.rings;draw();text($('detail'),'Base map loaded: {count} land outlines.',{count:land.length})}catch(_){text($('detail'),'That file is not a valid land.json.')}});
+if (embedded) {
+ window.setSutelliteTheme = theme => {
+  document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
+  draw();
+ };
+ $('mode').value="bi";
+ setMode(true);
+ fetch("assets/countries.json").then(response=>{
+  if (!response.ok) throw new Error("Base map unavailable.");
+  return response.json();
+ }).then(data=>{
+  land=data.features.flatMap(({geometry})=>{
+   if (geometry?.type==="Polygon") return [geometry.coordinates[0]];
+   if (geometry?.type==="MultiPolygon") return geometry.coordinates.map(polygon=>polygon[0]);
+   return [];
+  });
+  draw();
+ }).catch(()=>{});
+ let currentMap;
+ window.showSutelliteCells=(data,period,label)=>{
+  if(currentMap!==data) {
+   currentMap=data;
+   loadG(unpackMap(data),label,true,period);
+  } else {
+   const changed=F.y0!==period.year||F.month!==period.month||F.measure!==period.measure;
+   F.y0=F.y1=period.year;F.month=period.month;F.measure=period.measure;
+   $('banner').textContent=label;
+   if(changed)refilter();
+  }
+ };
+} else {
+ loadG(synthG(),'',false);
+ text($('banner'),'Synthetic preview. Load a map_cells.json v2 file to see your measurements.');
+}
+</script>
+</body>
+</html>
